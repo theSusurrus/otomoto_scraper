@@ -1,4 +1,4 @@
-from requests import get
+import requests
 from requests.exceptions import RequestException
 from contextlib import closing
 from bs4 import BeautifulSoup
@@ -16,7 +16,7 @@ def simple_get(url):
     text content, otherwise return None.
     """
     try:
-        with closing(get(url, stream=True)) as resp:
+        with closing(requests.get(url, stream=True)) as resp:
             if is_good_response(resp):
                 return resp.content
             else:
@@ -47,7 +47,7 @@ def log_verbose(string, verbose_switch, end="\n"):
     if verbose_switch:
         print(string, end=end)
 
-def scrape_offer_list(dist = 50, loc = 'lodz', cat = 'motocykle-i-quady', verbose_switch = False):
+def scrape_offer_list(dist = 5, loc = 'kolo', cat = 'motocykle-i-quady', verbose_switch = False):
     base_url = 'https://www.otomoto.pl'
     post_url = f'?search[order]=created_at_first%3Adesc&search[dist]={dist}&search[country]='
     url = '/'.join([base_url, cat, loc, post_url])
@@ -133,7 +133,7 @@ def scrape_offer_list(dist = 50, loc = 'lodz', cat = 'motocykle-i-quady', verbos
             else:
                 offer_currency = None
 
-            moto = motorcycle_offer(model_name = offer_model, capacity_cm3 = offer_capacity, price = offer_price, currency = offer_currency, url = offer_link, body = offer_body, mileage = offer_mileage, year = offer_year)
+            moto = motorcycle_offer(model_name = offer_model, capacity_cm3 = offer_capacity, price = offer_price, currency = offer_currency, url = offer_link, body = offer_body, mileage = offer_mileage, year = offer_year, moto_id=offer_id)
             moto_shelf[str(offer_id)] = moto
 
     moto_shelf.close()
@@ -141,6 +141,27 @@ def scrape_offer_list(dist = 50, loc = 'lodz', cat = 'motocykle-i-quady', verbos
     log_verbose(f'Dumped to {db_directory}/', verbose_switch)
 
     return moto_shelf_filename
+
+def scrape_photos_for_offer(moto):
+    raw_html = simple_get(moto.url)
+    soup = BeautifulSoup(raw_html, 'html.parser')
+    photo_tags = soup.find_all(class_="bigImage")
+    model_name_no_whtsp = moto.model_name.replace(' ', '')
+    offer_dir = f'data/{moto.moto_id}_{model_name_no_whtsp}'
+    if not os.path.isdir("data"):
+        os.mkdir("data")
+    if not os.path.isdir(offer_dir):
+        os.mkdir(offer_dir)
+        for photo_idx, photo_tag in enumerate(photo_tags):
+            photo_url = photo_tag.attrs['data-lazy']
+            with open(f'{offer_dir}/img{photo_idx}.jpg', 'wb') as photo_file:
+                response = requests.get(photo_url, stream=True)
+                if not response.ok:
+                    print(response)
+                for block in response.iter_content(1024):
+                    if not block:
+                        break
+                    photo_file.write(block)
 
 if __name__ == "__main__":
     scrape_offer_list(verbose_switch=True)

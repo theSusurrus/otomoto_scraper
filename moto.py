@@ -1,5 +1,5 @@
 class motorcycle_offer:
-    def __init__(self, model_name, capacity_cm3, price, currency, url, body, mileage, year):
+    def __init__(self, model_name, capacity_cm3, price, currency, url, body, mileage, year, moto_id):
         self.model_name = str(model_name)
         self.capacity_cm3 = int(capacity_cm3) if capacity_cm3 is not None else None
         self.price = int(price) if price is not None else None
@@ -8,6 +8,7 @@ class motorcycle_offer:
         self.mileage = int(mileage) if mileage is not None else None
         self.currency = str(currency)
         self.year = str(year)
+        self.moto_id = int(moto_id) if moto_id is not None else None
 
     def __str__(self):
         return f'{self.model_name}, {self.capacity_cm3} cm3, {self.year}, {self.price} {self.currency}'
