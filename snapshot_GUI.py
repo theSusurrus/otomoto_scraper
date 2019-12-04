@@ -4,7 +4,7 @@ import shelve
 from moto import motorcycle_offer
 from time import sleep
 
-class SnapshotApp:
+class SnapshotBrowserApp:
     def __init__(self, parent):
         self.parent = parent
         self.shelf = None
@@ -68,16 +68,16 @@ class SnapshotApp:
         shelf_file = scrape_offer_list(dist=dist, loc=loc)
         self.shelf = shelve.open(shelf_file)
         id_list = self.shelf.keys()
+        self.snapshot_list.delete(1, tki.END)
         for index, id in enumerate(id_list):
-            self.snapshot_list.delete(1, tki.END)
             self.snapshot_list.insert(index, self.shelf[id])
             self.index_to_id[index] = id
 
     def offer_list_poll(self):
-        now = self.snapshot_list.curselection()
-        if now is not self.current_list_selection:
-            self.print_details(now)
-            self.current_list_selection = now
+        current_list_selection = self.snapshot_list.curselection()
+        if current_list_selection is not self.current_list_selection:
+            self.print_details(current_list_selection)
+            self.current_list_selection = current_list_selection
         self.parent.after(250, self.offer_list_poll)
     
     def print_details(self, index):
@@ -88,5 +88,5 @@ class SnapshotApp:
 
 if __name__ == "__main__":
     root = tki.Tk()
-    app = SnapshotApp(root)
+    app = SnapshotBrowserApp(root)
     root.mainloop()
