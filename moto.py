@@ -10,6 +10,9 @@ class motorcycle_offer:
         self.year = str(year)
 
     def __str__(self):
+        return f'{self.model_name}, {self.capacity_cm3} cm3, {self.year}, {self.price} {self.currency}'
+
+    def pretty_str(self):
         result = []
         header_width = 40
         filler = int((header_width - len(self.model_name)) / 2)

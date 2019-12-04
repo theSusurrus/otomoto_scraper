@@ -47,10 +47,10 @@ def log_verbose(string, verbose_switch, end="\n"):
     if verbose_switch:
         print(string, end=end)
 
-def scrape_offer_list(search_dist = 50, loc_url = 'lodz', cat_url = 'motocykle-i-quady', verbose_switch = False):
+def scrape_offer_list(dist = 50, loc = 'lodz', cat = 'motocykle-i-quady', verbose_switch = False):
     base_url = 'https://www.otomoto.pl'
-    post_url = f'?search[order]=created_at_first%3Adesc&search[dist]={search_dist}&search[country]='
-    url = '/'.join([base_url, cat_url, loc_url, post_url])
+    post_url = f'?search[order]=created_at_first%3Adesc&search[dist]={dist}&search[country]='
+    url = '/'.join([base_url, cat, loc, post_url])
 
     raw_html = simple_get(url)
     soup = BeautifulSoup(raw_html, 'html.parser')
@@ -75,7 +75,8 @@ def scrape_offer_list(search_dist = 50, loc_url = 'lodz', cat_url = 'motocykle-i
         shutil.rmtree(db_directory)
     os.mkdir(db_directory)
     offer_file = open(f"{db_directory}/offer_file.html", "w+")
-    moto_shelf = shelve.open(f"{db_directory}/moto_shelf")
+    moto_shelf_filename = f"{db_directory}/moto_shelf"
+    moto_shelf = shelve.open(moto_shelf_filename)
 
     for soup_counter, soup in enumerate(soup_list):
         log_verbose(f'interpreting {((soup_counter / num_pages) * 100):.0f}%', verbose_switch, end="\r")
@@ -138,6 +139,8 @@ def scrape_offer_list(search_dist = 50, loc_url = 'lodz', cat_url = 'motocykle-i
     moto_shelf.close()
 
     log_verbose(f'Dumped to {db_directory}/', verbose_switch)
+
+    return moto_shelf_filename
 
 if __name__ == "__main__":
     scrape_offer_list(verbose_switch=True)
