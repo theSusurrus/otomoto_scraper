@@ -143,24 +143,24 @@ def scrape_offer_list(dist = 5, loc = 'kolo', cat = 'motocykle-i-quady', verbose
     return moto_shelf_filename
 
 def scrape_photos_for_offer(moto):
-    raw_html = simple_get(moto.url)
-    soup = BeautifulSoup(raw_html, 'html.parser')
-    photo_tags = soup.find_all(class_="bigImage")
     offer_dir = f'data/{moto.moto_id}'
-    if not os.path.isdir("data"):
-        os.mkdir("data")
     if not os.path.isdir(offer_dir):
         os.mkdir(offer_dir)
-        for photo_idx, photo_tag in enumerate(photo_tags):
-            photo_url = photo_tag.attrs['data-lazy']
-            with open(f'{offer_dir}/img{photo_idx}.jpg', 'wb') as photo_file:
-                response = requests.get(photo_url, stream=True)
-                if not response.ok:
-                    print(response)
-                for block in response.iter_content(1024):
-                    if not block:
-                        break
-                    photo_file.write(block)
+        raw_html = simple_get(moto.url)
+        soup = BeautifulSoup(raw_html, 'html.parser')
+        photo_tags = soup.find_all(class_="bigImage")
+        if not os.path.isdir("data"):
+            os.mkdir("data")
+            for photo_idx, photo_tag in enumerate(photo_tags):
+                photo_url = photo_tag.attrs['data-lazy']
+                with open(f'{offer_dir}/img{photo_idx}.jpg', 'wb') as photo_file:
+                    response = requests.get(photo_url, stream=True)
+                    if not response.ok:
+                        print(response)
+                    for block in response.iter_content(1024):
+                        if not block:
+                            break
+                        photo_file.write(block)
 
 if __name__ == "__main__":
     scrape_offer_list(verbose_switch=True)
