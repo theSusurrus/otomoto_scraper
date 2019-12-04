@@ -146,8 +146,7 @@ def scrape_photos_for_offer(moto):
     raw_html = simple_get(moto.url)
     soup = BeautifulSoup(raw_html, 'html.parser')
     photo_tags = soup.find_all(class_="bigImage")
-    model_name_no_whtsp = moto.model_name.replace(' ', '')
-    offer_dir = f'data/{moto.moto_id}_{model_name_no_whtsp}'
+    offer_dir = f'data/{moto.moto_id}'
     if not os.path.isdir("data"):
         os.mkdir("data")
     if not os.path.isdir(offer_dir):
