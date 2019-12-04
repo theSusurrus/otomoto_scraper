@@ -1,10 +1,13 @@
 import tkinter as tki
 from scrape_otomoto import scrape_offer_list
 import shelve
+from moto import motorcycle_offer
 
 class SnapshotApp:
     def __init__(self, parent):
+        self.parent = parent
         self.shelf = None
+        self.index_to_id = {}
 
         self.top_container = tki.Frame(parent)
         self.top_container.pack(side=tki.TOP)
@@ -15,8 +18,12 @@ class SnapshotApp:
         self.details_container = tki.Frame(self.top_container)
         self.details_container.pack(side=tki.RIGHT)
 
+        self.details_text = tki.Text(self.details_container)
+        self.details_text.pack(side=tki.BOTTOM)
+
         self.snapshot_list = tki.Listbox(self.snapshot_container, height=40, width=50)
         self.snapshot_list.pack(side=tki.BOTTOM)
+        self.current_list_selection = None
 
         self.snapshot_props_container = tki.Frame(self.snapshot_container)
         self.snapshot_props_container.pack(side=tki.TOP)
@@ -43,6 +50,8 @@ class SnapshotApp:
         self.clean_button = tki.Button(self.button_container, text="Load snapshot", background="grey")
         self.clean_button.pack(side=tki.RIGHT)
 
+        self.offer_list_poll()
+
     def __del__(self):
         if self.shelf is not None:
             self.shelf.close()
@@ -51,11 +60,25 @@ class SnapshotApp:
         self.create_snapshot()
 
     def create_snapshot(self):
-        shelf_file = scrape_offer_list(dist=5, loc='lodz')
+        shelf_file = scrape_offer_list(dist=5, loc='kolo')
         self.shelf = shelve.open(shelf_file)
         id_list = self.shelf.keys()
         for index, id in enumerate(id_list):
             self.snapshot_list.insert(index, self.shelf[id])
+            self.index_to_id[index] = id
+
+    def offer_list_poll(self):
+        now = self.snapshot_list.curselection()
+        if now is not self.current_list_selection:
+            self.print_details(now)
+            self.current_list_selection = now
+        self.parent.after(250, self.offer_list_poll)
+    
+    def print_details(self, index):
+        if len(index) > 0:
+            moto = self.shelf[self.index_to_id[index[0]]]
+            self.details_text.delete(1.0, tki.END)
+            self.details_text.insert(tki.END, moto.pretty_str())
 
 if __name__ == "__main__":
     root = tki.Tk()
