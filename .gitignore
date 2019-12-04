@@ -1,0 +1,7 @@
+*.html
+*.csv
+*.txt
+.gitignore
+.vscode
+snapshot*/
+__pycache__
