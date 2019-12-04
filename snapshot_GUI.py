@@ -2,6 +2,7 @@ import tkinter as tki
 from scrape_otomoto import scrape_offer_list
 import shelve
 from moto import motorcycle_offer
+from time import sleep
 
 class SnapshotApp:
     def __init__(self, parent):
@@ -33,12 +34,14 @@ class SnapshotApp:
 
         self.snapshot_loc_entry = tki.Entry(self.snapshot_props_container)
         self.snapshot_loc_entry.pack(side=tki.LEFT)
+        self.snapshot_loc_entry.insert(tki.END, 'lodz')
 
         self.snapshot_dist_label = tki.Label(self.snapshot_props_container, text="Radius")
         self.snapshot_dist_label.pack(side=tki.LEFT)
 
         self.snapshot_dist_entry = tki.Entry(self.snapshot_props_container)
         self.snapshot_dist_entry.pack(side=tki.RIGHT)
+        self.snapshot_dist_entry.insert(tki.END, '50')
 
         self.button_container = tki.Frame(parent)
         self.button_container.pack(side=tki.BOTTOM)
@@ -60,10 +63,13 @@ class SnapshotApp:
         self.create_snapshot()
 
     def create_snapshot(self):
-        shelf_file = scrape_offer_list(dist=5, loc='kolo')
+        dist = int(self.snapshot_dist_entry.get())
+        loc = self.snapshot_loc_entry.get()
+        shelf_file = scrape_offer_list(dist=dist, loc=loc)
         self.shelf = shelve.open(shelf_file)
         id_list = self.shelf.keys()
         for index, id in enumerate(id_list):
+            self.snapshot_list.delete(1, tki.END)
             self.snapshot_list.insert(index, self.shelf[id])
             self.index_to_id[index] = id
 
