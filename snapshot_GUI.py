@@ -14,7 +14,9 @@ class SnapshotBrowserApp:
         self.index_to_id = {}
         self.image_side = 400
         self.image_size = (self.image_side, self.image_side)
-        self.current_image_index = None
+        self.current_image_index = 0
+        self.canvas_ratio = 0.5
+        self.current_moto = None
         self.displayed_image = ImageTk.PhotoImage(Image.open('default.jpg'))#.resize(self.image_size))
 
         self.top_container = tki.Frame(parent)
@@ -86,35 +88,43 @@ class SnapshotBrowserApp:
 
     def offer_list_poll(self):
         current_list_selection = self.snapshot_list.curselection()
-        if current_list_selection is not self.current_list_selection:
-            self.print_details(current_list_selection)
+        selection_changed = False
+        if current_list_selection != self.current_list_selection:
+            if len(current_list_selection) > 0:
+                self.current_moto = self.shelf[self.index_to_id[current_list_selection[0]]]
+                self.print_details(current_list_selection)
+                self.current_list_selection = current_list_selection
+                selection_changed = True
+            else:
+                self.current_moto = None
+        
+        current_canvas_ratio = self.detail_canvas.winfo_width() / self.detail_canvas.winfo_height()
+        if (current_canvas_ratio != self.canvas_ratio) or selection_changed:
             self.display_image(current_list_selection)
-            self.current_list_selection = current_list_selection
-        self.parent.after(250, self.offer_list_poll)
+
+        self.parent.after(50, self.offer_list_poll)
     
     def print_details(self, index):
         if len(index) > 0:
-            moto = self.shelf[self.index_to_id[index[0]]]
             self.details_text.delete(1.0, tki.END)
-            self.details_text.insert(tki.END, moto.pretty_str())
+            self.details_text.insert(tki.END, self.current_moto.pretty_str())
 
-    def display_image(self, offer_index, image_index=0):
+    def display_image(self, offer_index):
         if len(offer_index) > 0:
-            moto = self.shelf[self.index_to_id[offer_index[0]]]
-            scrape_photos_for_offer(moto)
-            image_filename = f'data/{moto.moto_id}/img{image_index}.jpg'
+            scrape_photos_for_offer(self.current_moto)
+            image_filename = f'data/{self.current_moto.moto_id}/img{self.current_image_index}.jpg'
             if os.path.isfile(image_filename):
-                max_width = self.detail_canvas.winfo_width()
-                max_height = self.detail_canvas.winfo_height()
-                max_ratio = max_width / max_height
+                canvas_width = self.detail_canvas.winfo_width()
+                canvas_height = self.detail_canvas.winfo_height()
+                self.canvas_ratio = canvas_width / canvas_height
                 image = Image.open(image_filename)
                 image_ratio = image.width / image.height
-                if image_ratio > max_ratio:
-                    image = image.resize((max_width, math.floor(max_width / image_ratio)))
+                if image_ratio > self.canvas_ratio:
+                    image = image.resize((canvas_width, math.floor(canvas_width / image_ratio)))
                 else:
-                    image = image.resize((math.floor(max_height * image_ratio), max_height))
+                    image = image.resize((math.floor(canvas_height * image_ratio), canvas_height))
                 self.displayed_image = ImageTk.PhotoImage(image)
-                self.detail_canvas.create_image(math.floor(max_width / 2), math.floor(max_height / 2), anchor=tki.CENTER, image=self.displayed_image)
+                self.detail_canvas.create_image(math.floor(canvas_width / 2), math.floor(canvas_height / 2), anchor=tki.CENTER, image=self.displayed_image)
 
 if __name__ == "__main__":
     root = tki.Tk()
