@@ -1,11 +1,14 @@
 import tkinter as tki
-from scrape_otomoto import scrape_offer_list, scrape_photos_for_offer
+import tkinter.filedialog
+from scrape_otomoto import scrape_offer_list, scrape_details_for_offer
 import shelve
 import os
+import shutil
 from moto import motorcycle_offer
 from time import sleep
 from PIL import ImageTk, Image
 import math
+import glob
 
 class SnapshotBrowserApp:
     def __init__(self, parent):
@@ -32,7 +35,7 @@ class SnapshotBrowserApp:
         self.details_bottom_container = tki.Frame(self.details_container)
         self.details_bottom_container.pack(side=tki.BOTTOM, fill=tki.X, expand=False)
 
-        self.details_text = tki.Text(self.details_bottom_container, height=10, width=40)
+        self.details_text = tki.Text(self.details_bottom_container, height=15)
         self.details_text.pack(side=tki.BOTTOM, fill=tki.X, expand=True)
 
         self.picture_buttons_container = tki.Frame(self.details_bottom_container)
@@ -56,20 +59,6 @@ class SnapshotBrowserApp:
         self.snapshot_props_container = tki.Frame(self.snapshot_container)
         self.snapshot_props_container.pack(side=tki.TOP)
 
-        self.snapshot_loc_label = tki.Label(self.snapshot_props_container, text="City")
-        self.snapshot_loc_label.pack(side=tki.LEFT)
-
-        self.snapshot_loc_entry = tki.Entry(self.snapshot_props_container)
-        self.snapshot_loc_entry.pack(side=tki.LEFT)
-        self.snapshot_loc_entry.insert(tki.END, 'kolo')
-
-        self.snapshot_dist_label = tki.Label(self.snapshot_props_container, text="Radius")
-        self.snapshot_dist_label.pack(side=tki.LEFT)
-
-        self.snapshot_dist_entry = tki.Entry(self.snapshot_props_container)
-        self.snapshot_dist_entry.pack(side=tki.RIGHT)
-        self.snapshot_dist_entry.insert(tki.END, '5')
-
         self.button_container = tki.Frame(parent)
         self.button_container.pack(side=tki.BOTTOM)
 
@@ -77,8 +66,31 @@ class SnapshotBrowserApp:
         self.scrape_button.pack(side=tki.LEFT)
         self.scrape_button.bind("<Button-1>", self.scrape_button_click)
 
-        self.clean_button = tki.Button(self.button_container, text="Load snapshot", background="grey")
+        self.snapshot_loc_label = tki.Label(self.button_container, text="City")
+        self.snapshot_loc_label.pack(side=tki.LEFT)
+
+        self.snapshot_loc_entry = tki.Entry(self.button_container)
+        self.snapshot_loc_entry.pack(side=tki.LEFT)
+        self.snapshot_loc_entry.insert(tki.END, 'kolo')
+
+        self.snapshot_dist_label = tki.Label(self.button_container, text="Radius")
+        self.snapshot_dist_label.pack(side=tki.LEFT)
+
+        self.snapshot_dist_entry = tki.Entry(self.button_container)
+        self.snapshot_dist_entry.pack(side=tki.LEFT)
+        self.snapshot_dist_entry.insert(tki.END, '5')
+
+        self.scrape_details_button = tki.Button(self.button_container, text="Scrape all details")
+        self.scrape_details_button.pack(side=tki.LEFT)
+        self.scrape_details_button.bind("<Button-1>", self.scrape_details_button_click)
+
+        self.load_button = tki.Button(self.button_container, text="Load snapshot")
+        self.load_button.pack(side=tki.RIGHT)
+        self.load_button.bind("<Button-1>", self.load_button_click)
+
+        self.clean_button = tki.Button(self.button_container, text="Delete all snapshots")
         self.clean_button.pack(side=tki.RIGHT)
+        self.clean_button.bind("<Button-1>", self.clean_button_click)
 
         self.offer_list_poll()
 
@@ -89,6 +101,23 @@ class SnapshotBrowserApp:
     def scrape_button_click(self, event):
         self.create_snapshot()
 
+    def scrape_details_button_click(self, event):
+        for moto_index, moto_str in enumerate(self.snapshot_list.get(0, tki.END)):
+            scrape_details_for_offer(self.shelf[self.index_to_id[moto_index]])
+    
+    def clean_button_click(self, event):
+        shutil.rmtree('data/')
+
+    def load_button_click(self, event):
+        if self.shelf != None:
+            self.shelf.close()
+        filename = tki.filedialog.askopenfilename(initialdir=os.path.dirname(os.path.abspath(__file__)))
+        start_index = filename.index("data/")
+        end_index = filename.index(".")
+        shelf_name = filename[start_index:end_index]
+        self.shelf = shelve.open(shelf_name)
+        self.construct_listbox_list()
+
     def create_snapshot(self):
         self.current_moto = None
         self.image_update_pending = True
@@ -96,6 +125,9 @@ class SnapshotBrowserApp:
         loc = self.snapshot_loc_entry.get()
         shelf_file = scrape_offer_list(dist=dist, loc=loc)
         self.shelf = shelve.open(shelf_file)
+        self.construct_listbox_list()
+
+    def construct_listbox_list(self):
         id_list = self.shelf.keys()
         self.snapshot_list.delete(1, tki.END)
         for index, id in enumerate(id_list):
@@ -104,19 +136,18 @@ class SnapshotBrowserApp:
 
     def offer_list_poll(self):
         current_list_selection = self.snapshot_list.curselection()
-        selection_changed = False
         if current_list_selection != self.current_list_selection:
             self.current_image_index = 0
             if len(current_list_selection) > 0:
                 self.current_moto = self.shelf[self.index_to_id[current_list_selection[0]]]
-                self.print_details(current_list_selection)
+                self.print_details(self.current_moto)
                 self.current_list_selection = current_list_selection
-                selection_changed = True
+                self.image_update_pending = True
             else:
                 self.current_moto = None
         
         current_canvas_ratio = self.detail_canvas.winfo_width() / self.detail_canvas.winfo_height()
-        if (current_canvas_ratio != self.canvas_ratio) or selection_changed or self.image_update_pending:
+        if (current_canvas_ratio != self.canvas_ratio) or self.image_update_pending:
             if self.current_moto != None:
                 self.display_image(True)
                 self.image_update_pending = False
@@ -131,17 +162,17 @@ class SnapshotBrowserApp:
 
         self.parent.after(50, self.offer_list_poll)
     
-    def print_details(self, index):
-        if len(index) > 0:
-            self.details_text.delete(1.0, tki.END)
-            self.details_text.insert(tki.END, self.current_moto.pretty_str())
+    def print_details(self, moto):
+        self.details_text.delete(1.0, tki.END)
+        self.details_text.insert(tki.END, moto.pretty_str())
 
     def display_image(self, true_photo):
         canvas_width = self.detail_canvas.winfo_width()
         canvas_height = self.detail_canvas.winfo_height()
         self.canvas_ratio = canvas_width / canvas_height
         if true_photo:
-            scrape_photos_for_offer(self.current_moto)
+            scrape_details_for_offer(self.current_moto)
+            self.print_details(self.current_moto)
             image_filename = f'data/{self.current_moto.moto_id}/img{self.current_image_index}.jpg'
             if os.path.isfile(image_filename):
                 image = Image.open(image_filename)
@@ -178,6 +209,7 @@ class SnapshotBrowserApp:
             return 0
 
 if __name__ == "__main__":
+    os.chdir(os.path.dirname(os.path.abspath(__file__)))
     root = tki.Tk()
     app = SnapshotBrowserApp(root)
     root.mainloop()

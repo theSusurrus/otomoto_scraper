@@ -70,7 +70,9 @@ def scrape_offer_list(dist = 5, loc = 'kolo', cat = 'motocykle-i-quady', verbose
         log_verbose(f'download {((page_idx / num_pages) * 100):.0f}%', verbose_switch, end="\r")
         
     timestamp = time.strftime("%Y_%m_%d", time.localtime())
-    db_directory = f"snapshot_{timestamp}"
+    if not os.path.isdir('data/'):
+        os.mkdir('data/')
+    db_directory = f"data/snapshot_{loc}_{dist}_{timestamp}"
     if os.path.isdir(db_directory):
         shutil.rmtree(db_directory)
     os.mkdir(db_directory)
@@ -142,7 +144,7 @@ def scrape_offer_list(dist = 5, loc = 'kolo', cat = 'motocykle-i-quady', verbose
 
     return moto_shelf_filename
 
-def scrape_photos_for_offer(moto):
+def scrape_details_for_offer(moto):
     if not os.path.isdir("data"):
         os.mkdir("data")
     offer_dir = f'data/{moto.moto_id}'
@@ -161,6 +163,9 @@ def scrape_photos_for_offer(moto):
                     if not block:
                         break
                     photo_file.write(block)
+        description_tag = soup.find(class_="offer-description__description")
+        description_text = [str(content).replace('\n', '').strip() for content in description_tag.contents if isinstance(content, str) and str(content) != '\n']
+        moto.description = '\n'.join(description_text)
 
 if __name__ == "__main__":
     scrape_offer_list(verbose_switch=True)

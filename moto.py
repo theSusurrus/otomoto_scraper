@@ -9,20 +9,21 @@ class motorcycle_offer:
         self.currency = str(currency)
         self.year = str(year)
         self.moto_id = int(moto_id) if moto_id is not None else None
+        self.description = None
 
     def __str__(self):
-        return f'{self.model_name}, {self.capacity_cm3} cm3, {self.year}, {self.price} {self.currency}'
+        result = f'{self.model_name}'
+        if self.capacity_cm3 != None:
+            result += f' {self.capacity_cm3} cm3'
+        return result
 
     def pretty_str(self):
         result = []
-        header_width = 40
-        filler = int((header_width - len(self.model_name)) / 2)
-        header_string = '-' * filler + self.model_name + '-' * filler + '\n'
-        result.append(header_string)
+        result.append(f'{self.model_name}\n')
         result.append(f'{self.year}\n')
         result.append(f'{self.mileage} km\n')
         result.append(f'{self.capacity_cm3} cm3\n')
         result.append(f'{self.price} {self.currency}\n')
+        result.append(f'{self.description}\n')
         result.append(f'{self.url}\n')
-        result.append('\n')
         return ''.join(result)
