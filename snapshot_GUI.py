@@ -1,9 +1,11 @@
 import tkinter as tki
 from scrape_otomoto import scrape_offer_list, scrape_photos_for_offer
 import shelve
+import os
 from moto import motorcycle_offer
 from time import sleep
 from PIL import ImageTk, Image
+import math
 
 class SnapshotBrowserApp:
     def __init__(self, parent):
@@ -12,6 +14,7 @@ class SnapshotBrowserApp:
         self.index_to_id = {}
         self.image_side = 400
         self.image_size = (self.image_side, self.image_side)
+        self.current_image_index = None
         self.displayed_image = ImageTk.PhotoImage(Image.open('default.jpg'))#.resize(self.image_size))
 
         self.top_container = tki.Frame(parent)
@@ -95,12 +98,23 @@ class SnapshotBrowserApp:
             self.details_text.delete(1.0, tki.END)
             self.details_text.insert(tki.END, moto.pretty_str())
 
-    def display_image(self, index):
-        if len(index) > 0:
-            moto = self.shelf[self.index_to_id[index[0]]]
+    def display_image(self, offer_index, image_index=0):
+        if len(offer_index) > 0:
+            moto = self.shelf[self.index_to_id[offer_index[0]]]
             scrape_photos_for_offer(moto)
-            self.displayed_image = ImageTk.PhotoImage(Image.open(f'data/{moto.moto_id}/img0.jpg'))
-            self.detail_canvas.create_image(0, 0, anchor=tki.NW, image=self.displayed_image)
+            image_filename = f'data/{moto.moto_id}/img{image_index}.jpg'
+            if os.path.isfile(image_filename):
+                max_width = self.detail_canvas.winfo_width()
+                max_height = self.detail_canvas.winfo_height()
+                max_ratio = max_width / max_height
+                image = Image.open(image_filename)
+                image_ratio = image.width / image.height
+                if image_ratio > max_ratio:
+                    image = image.resize((max_width, math.floor(max_width / image_ratio)))
+                else:
+                    image = image.resize((math.floor(max_height * image_ratio), max_height))
+                self.displayed_image = ImageTk.PhotoImage(image)
+                self.detail_canvas.create_image(math.floor(max_width / 2), math.floor(max_height / 2), anchor=tki.CENTER, image=self.displayed_image)
 
 if __name__ == "__main__":
     root = tki.Tk()
