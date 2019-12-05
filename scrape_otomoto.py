@@ -47,7 +47,7 @@ def log_verbose(string, verbose_switch, end="\n"):
     if verbose_switch:
         print(string, end=end)
 
-def scrape_offer_list(dist = 5, loc = 'kolo', cat = 'motocykle-i-quady', verbose_switch = False):
+def scrape_offer_list(dist, loc, cat = 'motocykle-i-quady', verbose_switch = False, scrape_details=False):
     base_url = 'https://www.otomoto.pl'
     post_url = f'?search[order]=created_at_first%3Adesc&search[dist]={dist}&search[country]='
     url = '/'.join([base_url, cat, loc, post_url])
@@ -138,9 +138,16 @@ def scrape_offer_list(dist = 5, loc = 'kolo', cat = 'motocykle-i-quady', verbose
             moto = motorcycle_offer(model_name = offer_model, capacity_cm3 = offer_capacity, price = offer_price, currency = offer_currency, url = offer_link, body = offer_body, mileage = offer_mileage, year = offer_year, moto_id=offer_id)
             moto_shelf[str(offer_id)] = moto
 
+    if scrape_details_for_offer:
+        log_verbose(f'Scraping photos      ', verbose_switch)
+        num_offers = len(moto_shelf)
+        for index, key in enumerate(moto_shelf):
+            log_verbose(f'downloading {int((index / num_offers) * 100)}%', verbose_switch, end='\r')
+            scrape_details_for_offer(moto_shelf[key])
+
     moto_shelf.close()
 
-    log_verbose(f'Dumped to {db_directory}/', verbose_switch)
+    log_verbose(f'Dumped snapshot to {db_directory}/', verbose_switch)
 
     return moto_shelf_filename
 
@@ -168,4 +175,4 @@ def scrape_details_for_offer(moto):
         moto.description = '\n'.join(description_text)
 
 if __name__ == "__main__":
-    scrape_offer_list(verbose_switch=True)
+    scrape_offer_list(loc='lodz', dist=5, verbose_switch=True, scrape_details=True)
