@@ -19,9 +19,9 @@ class motorcycle_offer:
         filler = int((header_width - len(self.model_name)) / 2)
         header_string = '-' * filler + self.model_name + '-' * filler + '\n'
         result.append(header_string)
-        result.append(f'{self.capacity_cm3} cm3\n')
+        result.append(f'{self.year}\n')
         result.append(f'{self.mileage} km\n')
-        result.append(f'{self.year}')
+        result.append(f'{self.capacity_cm3} cm3\n')
         result.append(f'{self.price} {self.currency}\n')
         result.append(f'{self.url}\n')
         result.append('\n')

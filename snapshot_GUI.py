@@ -12,12 +12,10 @@ class SnapshotBrowserApp:
         self.parent = parent
         self.shelf = None
         self.index_to_id = {}
-        self.image_side = 400
-        self.image_size = (self.image_side, self.image_side)
         self.current_image_index = 0
-        self.canvas_ratio = 0.5
+        self.image_update_pending = False
+        self.canvas_ratio = 1.0
         self.current_moto = None
-        self.displayed_image = ImageTk.PhotoImage(Image.open('default.jpg'))#.resize(self.image_size))
 
         self.top_container = tki.Frame(parent)
         self.top_container.pack(side=tki.TOP, fill=tki.BOTH, expand=True)
@@ -30,13 +28,29 @@ class SnapshotBrowserApp:
 
         self.detail_canvas = tki.Canvas(self.details_container)
         self.detail_canvas.pack(side=tki.TOP, expand=tki.YES, fill=tki.BOTH)
-        self.detail_canvas.create_image(0, 0, anchor=tki.NW, image=self.displayed_image)
 
-        self.details_text = tki.Text(self.details_container, height=10, width=40)
-        self.details_text.pack(side=tki.BOTTOM)
+        self.details_bottom_container = tki.Frame(self.details_container)
+        self.details_bottom_container.pack(side=tki.BOTTOM, fill=tki.X, expand=False)
 
-        self.snapshot_list = tki.Listbox(self.snapshot_container, height=40, width=50)
-        self.snapshot_list.pack(side=tki.BOTTOM)
+        self.details_text = tki.Text(self.details_bottom_container, height=10, width=40)
+        self.details_text.pack(side=tki.BOTTOM, fill=tki.X, expand=True)
+
+        self.picture_buttons_container = tki.Frame(self.details_bottom_container)
+        self.picture_buttons_container.pack(side=tki.TOP)
+
+        self.previous_picture_button = tki.Button(self.picture_buttons_container, text="<-")
+        self.previous_picture_button.pack(side=tki.LEFT)
+        self.previous_picture_button.bind("<Button-1>", self.switch_previous_picture)
+
+        self.picture_label = tki.Label(self.picture_buttons_container, text=" ", width=10)
+        self.picture_label.pack(side=tki.LEFT)
+
+        self.next_picture_button = tki.Button(self.picture_buttons_container, text="->")
+        self.next_picture_button.pack(side=tki.RIGHT)
+        self.next_picture_button.bind("<Button-1>", self.switch_next_picture)
+
+        self.snapshot_list = tki.Listbox(self.snapshot_container, width=50)
+        self.snapshot_list.pack(side=tki.BOTTOM, fill=tki.Y, expand=True)
         self.current_list_selection = None
 
         self.snapshot_props_container = tki.Frame(self.snapshot_container)
@@ -76,6 +90,8 @@ class SnapshotBrowserApp:
         self.create_snapshot()
 
     def create_snapshot(self):
+        self.current_moto = None
+        self.image_update_pending = True
         dist = int(self.snapshot_dist_entry.get())
         loc = self.snapshot_loc_entry.get()
         shelf_file = scrape_offer_list(dist=dist, loc=loc)
@@ -90,6 +106,7 @@ class SnapshotBrowserApp:
         current_list_selection = self.snapshot_list.curselection()
         selection_changed = False
         if current_list_selection != self.current_list_selection:
+            self.current_image_index = 0
             if len(current_list_selection) > 0:
                 self.current_moto = self.shelf[self.index_to_id[current_list_selection[0]]]
                 self.print_details(current_list_selection)
@@ -99,8 +116,18 @@ class SnapshotBrowserApp:
                 self.current_moto = None
         
         current_canvas_ratio = self.detail_canvas.winfo_width() / self.detail_canvas.winfo_height()
-        if (current_canvas_ratio != self.canvas_ratio) or selection_changed:
-            self.display_image(current_list_selection)
+        if (current_canvas_ratio != self.canvas_ratio) or selection_changed or self.image_update_pending:
+            if self.current_moto != None:
+                self.display_image(True)
+                self.image_update_pending = False
+                picture_count = self.count_pictures()
+                if picture_count > 0:
+                    picture_label_text = f'{self.current_image_index + 1} / {picture_count}'
+                else:
+                    picture_label_text = '-'
+                self.picture_label['text'] = picture_label_text
+            else:
+                self.display_image(False)
 
         self.parent.after(50, self.offer_list_poll)
     
@@ -109,14 +136,14 @@ class SnapshotBrowserApp:
             self.details_text.delete(1.0, tki.END)
             self.details_text.insert(tki.END, self.current_moto.pretty_str())
 
-    def display_image(self, offer_index):
-        if len(offer_index) > 0:
+    def display_image(self, true_photo):
+        canvas_width = self.detail_canvas.winfo_width()
+        canvas_height = self.detail_canvas.winfo_height()
+        self.canvas_ratio = canvas_width / canvas_height
+        if true_photo:
             scrape_photos_for_offer(self.current_moto)
             image_filename = f'data/{self.current_moto.moto_id}/img{self.current_image_index}.jpg'
             if os.path.isfile(image_filename):
-                canvas_width = self.detail_canvas.winfo_width()
-                canvas_height = self.detail_canvas.winfo_height()
-                self.canvas_ratio = canvas_width / canvas_height
                 image = Image.open(image_filename)
                 image_ratio = image.width / image.height
                 if image_ratio > self.canvas_ratio:
@@ -124,7 +151,31 @@ class SnapshotBrowserApp:
                 else:
                     image = image.resize((math.floor(canvas_height * image_ratio), canvas_height))
                 self.displayed_image = ImageTk.PhotoImage(image)
-                self.detail_canvas.create_image(math.floor(canvas_width / 2), math.floor(canvas_height / 2), anchor=tki.CENTER, image=self.displayed_image)
+        else:
+            image_side = int(min(canvas_height, canvas_width))
+            self.displayed_image = ImageTk.PhotoImage(Image.open('default.jpg').resize((image_side, image_side)))
+        self.detail_canvas.create_image(math.floor(canvas_width / 2), math.floor(canvas_height / 2), anchor=tki.CENTER, image=self.displayed_image)
+
+    def switch_next_picture(self, event):
+        image_filename = f'data/{self.current_moto.moto_id}/img{self.current_image_index + 1}.jpg'
+        if os.path.isfile(image_filename):
+            self.current_image_index += 1
+            self.image_update_pending = True
+
+    def switch_previous_picture(self, event):
+        image_filename = f'data/{self.current_moto.moto_id}/img{self.current_image_index - 1}.jpg'
+        if os.path.isfile(image_filename):
+            self.current_image_index -= 1
+            self.image_update_pending = True
+
+    def count_pictures(self):
+        counter = 0
+        if self.current_moto != None:
+            while os.path.isfile(f'data/{self.current_moto.moto_id}/img{counter}.jpg'):
+                counter += 1
+            return counter
+        else:
+            return 0
 
 if __name__ == "__main__":
     root = tki.Tk()
