@@ -1,7 +1,7 @@
 import tkinter as tki
 import tkinter.ttk as ttk
 import tkinter.filedialog
-from scrape_otomoto import scrape_offer_list, scrape_details_for_offer
+from scrape_otomoto import scrape_offer_list, scrape_details_for_offer, progress_description
 import shelve
 import os
 import shutil
@@ -20,7 +20,9 @@ class SnapshotBrowserApp:
         self.shelf = None
         self.shelf_ready_event = threading.Event()
         self.shelf_name = None
-        self.scraping_in_progress = False
+        self.list_scraping_in_progress = False
+        self.details_scraping_in_progress = False
+        self.details_ready_event = threading.Event()
         self.progress_queue = queue.Queue()
         self.index_to_id = {}
         self.current_moto = None
@@ -114,55 +116,132 @@ class SnapshotBrowserApp:
         if self.shelf is not None:
             self.shelf.close()
 
+    ###################################################################
+    # UI ACTIONS
     def scrape_button_click(self, event):
-        self.create_snapshot()
+        if not self.list_scraping_in_progress:
+            self.current_image_index = None
+            self.details_update_pending = True
+            dist = int(self.snapshot_dist_entry.get())
+            loc = self.snapshot_loc_entry.get()
+
+            timestamp = time.strftime("%Y_%m_%d", time.localtime())
+            if not os.path.isdir('data/'):
+                os.mkdir('data/')
+            db_directory = f"data/snapshot_{loc}_{dist}_{timestamp}"
+            if os.path.isdir(db_directory):
+                shutil.rmtree(db_directory)
+            os.mkdir(db_directory)
+            self.shelf_name = f"{db_directory}/moto_shelf"
+
+            scraping_thread = threading.Thread(target=scrape_offer_list, args=(dist, loc, self.shelf_name, self.shelf_ready_event, self.progress_queue))
+            scraping_thread.start()
+            self.list_scraping_in_progress = True
+
+    def scrape_details_button_click(self, event):
+        if not self.list_scraping_in_progress:
+            scraping_thread = threading.Thread(target=self.scrape_all_details)
+            scraping_thread.start()
+            self.details_scraping_in_progress = True
+    
+    def clean_button_click(self, event):
+        if not self.list_scraping_in_progress:
+            if self.shelf is not None:
+                self.shelf.close()
+                self.shelf = None
+            data_dirname = 'data/'
+            if os.path.isdir(data_dirname):
+                shutil.rmtree(data_dirname)
+            self.previous_selected_id = None
+            self.current_moto = None
+            self.current_image_index = None
+            self.construct_listbox_list()
+            self.display_image()
+            self.print_details()
+
+    def load_button_click(self, event):
+        if not self.list_scraping_in_progress:
+            if self.shelf != None:
+                self.shelf.close()
+            filename = tki.filedialog.askopenfilename(initialdir=os.path.dirname(os.path.abspath(__file__)))
+            start_index = filename.index("data/")
+            end_index = filename.index(".")
+            shelf_name = filename[start_index:end_index]
+            self.shelf = shelve.open(shelf_name)
+            self.construct_listbox_list()
+
+    def switch_picture(self, increment=0):
+        if self.current_moto is not None:
+            image_filename = f'data/{self.current_moto.moto_id}/img{self.current_image_index + increment}.jpg'
+            if os.path.isfile(image_filename):
+                self.raw_image = Image.open(image_filename)
+                self.current_image_index += increment
+                self.details_update_pending = True
+    # END OF UI ACTIONS
+    ###################################################################
+
+    # main widget refresh poll
+    def widget_refresh(self):
+        if self.any_actions_in_progress():
+            if self.list_scraping_in_progress:
+                if self.shelf_ready_event.isSet():
+                    self.shelf = shelve.open(self.shelf_name)
+                    self.construct_listbox_list()
+                    self.list_scraping_in_progress = False
+
+            if self.details_scraping_in_progress:
+                if self.details_ready_event.isSet():
+                    self.construct_listbox_list()
+                    self.details_scraping_in_progress = False
+                    
+            try:
+                progress = self.progress_queue.get(0)
+                self.display_progress(progress)
+            except queue.Empty:
+                pass
+        
+        if not self.any_actions_in_progress():
+            self.progress_label['text'] = ' ' * 20
+            self.progress_bar['value'] = 0
+            if self.shelf != None:
+                selected_moto = self.get_selected_moto()
+                if (selected_moto != self.current_moto) and (selected_moto is not None):
+                    self.current_moto = selected_moto
+                    if self.current_moto.moto_id != self.previous_selected_id:
+                        self.current_image_index = 0
+                        self.update_details()
+                        self.print_details()
+                        self.details_update_pending = True
+                        self.previous_selected_id = self.current_moto.moto_id
+                
+                current_canvas_ratio = self.detail_canvas.winfo_width() / self.detail_canvas.winfo_height()
+                if (current_canvas_ratio != self.canvas_ratio) or self.details_update_pending:
+                    if self.current_moto != None:
+                        self.display_image(true_photo=True)
+                        self.print_details()
+                    else:
+                        self.display_image()
+                    self.details_update_pending = False
+
+        self.parent.after(50, self.widget_refresh)
+    
+    def any_actions_in_progress(self):
+        return self.list_scraping_in_progress or self.details_scraping_in_progress
     
     def display_progress(self, progress_obj):
         self.progress_bar['value'] = progress_obj.progress * 100
         self.progress_label['text'] = progress_obj.description
 
-    def scrape_details_button_click(self, event):
-        for moto_index in range(self.snapshot_list.size()):
-            scrape_details_for_offer(self.shelf[self.index_to_id[moto_index]])
-    
-    def clean_button_click(self, event):
-        if self.shelf is not None:
-            self.shelf.close()
-            self.shelf = None
-        data_dirname = 'data/'
-        if os.path.isdir(data_dirname):
-            shutil.rmtree(data_dirname)
-        self.previous_selected_id = None
-        self.construct_listbox_list()
-
-    def load_button_click(self, event):
-        if self.shelf != None:
-            self.shelf.close()
-        filename = tki.filedialog.askopenfilename(initialdir=os.path.dirname(os.path.abspath(__file__)))
-        start_index = filename.index("data/")
-        end_index = filename.index(".")
-        shelf_name = filename[start_index:end_index]
-        self.shelf = shelve.open(shelf_name)
-        self.construct_listbox_list()
-
-    def create_snapshot(self):
-        self.current_image_index = None
-        self.details_update_pending = True
-        dist = int(self.snapshot_dist_entry.get())
-        loc = self.snapshot_loc_entry.get()
-
-        timestamp = time.strftime("%Y_%m_%d", time.localtime())
-        if not os.path.isdir('data/'):
-            os.mkdir('data/')
-        db_directory = f"data/snapshot_{loc}_{dist}_{timestamp}"
-        if os.path.isdir(db_directory):
-            shutil.rmtree(db_directory)
-        os.mkdir(db_directory)
-        self.shelf_name = f"{db_directory}/moto_shelf"
-
-        scraping_thread = threading.Thread(target=scrape_offer_list, args=(dist, loc, self.shelf_name, self.shelf_ready_event, self.progress_queue))
-        scraping_thread.start()
-        self.scraping_in_progress = True
+    def scrape_all_details(self):
+        self.details_ready_event.clear()
+        num_moto = self.snapshot_list.size()
+        for moto_index in range(num_moto):
+            progress = moto_index / num_moto
+            description = f'Downloading details {int(progress * 100)}%'
+            self.progress_queue.put(progress_description(progress, description))
+            moto = scrape_details_for_offer(self.shelf[self.index_to_id[moto_index]])
+            self.store_moto(moto)
+        self.details_ready_event.set()
 
     def construct_listbox_list(self):
         self.snapshot_list.delete(0, tki.END)
@@ -173,67 +252,29 @@ class SnapshotBrowserApp:
                 self.index_to_id[index] = id
         self.display_image()
         self.print_details()
-
-    def widget_refresh(self):
-        if self.shelf != None:
-            selected_moto = self.get_selected_moto()
-            if (selected_moto != self.current_moto) and (selected_moto is not None):
-                self.current_moto = selected_moto
-                if self.current_moto.moto_id != self.previous_selected_id:
-                    self.current_image_index = 0
-                    self.update_details(self.current_moto)
-                    self.print_details(self.current_moto)
-                    self.details_update_pending = True
-                    self.previous_selected_id = self.current_moto.moto_id
-            
-            current_canvas_ratio = self.detail_canvas.winfo_width() / self.detail_canvas.winfo_height()
-            if (current_canvas_ratio != self.canvas_ratio) or self.details_update_pending:
-                if self.current_moto != None:
-                    self.display_image(true_photo=True, current_moto=self.current_moto)
-                    self.print_details(self.current_moto)
-                else:
-                    self.display_image()
-                self.details_update_pending = False
-
-        if self.scraping_in_progress:
-            if self.shelf_ready_event.isSet():
-                self.shelf = shelve.open(self.shelf_name)
-                self.construct_listbox_list()
-                self.scraping_in_progress = False
-            else:
-                try:
-                    print("displaying progress")
-                    progress = self.progress_queue.get(0)
-                    self.display_progress(progress)
-                except queue.Empty:
-                    print("waiting on progress queue")
-                    pass
-        else:
-            self.progress_label['text'] = '' * 20
-            self.progress_bar['value'] = 0
-        self.parent.after(50, self.widget_refresh)
     
-    def print_details(self, moto=None):
+    def print_details(self):
         self.details_text.delete('1.0', tki.END)
-        if moto != None:
-            self.details_text.insert(tki.END, moto.pretty_str())
+        if self.current_moto != None:
+            self.details_text.insert(tki.END, self.current_moto.pretty_str())
 
-    def update_details(self, current_moto):
-        image_filename = f'data/{current_moto.moto_id}/img{self.current_image_index}.jpg'
-        if (not os.path.isfile(image_filename)) or (current_moto.description is None):
-            self.current_moto = scrape_details_for_offer(current_moto)
-            self.store_moto(current_moto)
-            current_list_selection = self.snapshot_list.curselection()
-            self.snapshot_list.delete(current_list_selection)
-            self.snapshot_list.insert(current_list_selection, current_moto)
-            self.raw_image = Image.open(image_filename)
+    def update_details(self):
+        image_filename = self.get_image_filename(self.current_moto, self.current_image_index)
+        if (not os.path.isfile(image_filename)) or (self.current_moto.description is None):
+            self.current_moto = scrape_details_for_offer(self.current_moto)
+            self.store_moto(self.current_moto)
+            self.construct_listbox_list()
 
+    def get_image_filename(self, moto, image_idx):
+        return f'data/{moto.moto_id}/img{image_idx}.jpg'
 
-    def display_image(self, true_photo=False, current_moto=None):
+    def display_image(self, true_photo=False):
         canvas_width = self.detail_canvas.winfo_width()
         canvas_height = self.detail_canvas.winfo_height()
         self.canvas_ratio = canvas_width / canvas_height
-        if true_photo and (self.raw_image is not None):
+        if true_photo:
+            image_filename = self.get_image_filename(self.current_moto, self.current_image_index)
+            self.raw_image = Image.open(image_filename)
             image_ratio = self.raw_image.width / self.raw_image.height
             new_size = None
             if image_ratio > self.canvas_ratio:
@@ -254,14 +295,6 @@ class SnapshotBrowserApp:
             picture_label_text = '-'
         self.picture_label['text'] = picture_label_text
 
-    def switch_picture(self, increment=1):
-        if self.current_moto is not None:
-            image_filename = f'data/{self.current_moto.moto_id}/img{self.current_image_index + increment}.jpg'
-            if os.path.isfile(image_filename):
-                self.raw_image = Image.open(image_filename)
-                self.current_image_index += increment
-                self.details_update_pending = True
-
     def count_pictures(self):
         counter = 0
         if self.current_moto != None:
@@ -281,8 +314,6 @@ class SnapshotBrowserApp:
     def store_moto(self, moto):
         if moto is not None:
             self.shelf[str(moto.moto_id)] = moto
-        else:
-            del self.shelf[str(moto.moto_id)]
 
 if __name__ == "__main__":
     os.chdir(os.path.dirname(os.path.abspath(__file__)))

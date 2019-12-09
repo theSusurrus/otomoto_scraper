@@ -52,7 +52,7 @@ def log_verbose(string, verbose_switch, end="\n"):
     if verbose_switch:
         print(string, end=end)
 
-def scrape_offer_list(dist, loc, shelf_name=None, shelf_ready_event=None, progress_queue=None, scrape_details=False, cat = 'motocykle-i-quady', verbose_switch = True):
+def scrape_offer_list(dist, loc, shelf_name=None, shelf_ready_event=None, progress_queue=None, scrape_details=False, cat = 'motocykle-i-quady', verbose_switch = False):
     if shelf_ready_event is not None:
         shelf_ready_event.clear()
 
@@ -154,11 +154,14 @@ def scrape_offer_list(dist, loc, shelf_name=None, shelf_ready_event=None, progre
             moto_shelf[str(offer_id)] = moto
 
     if scrape_details:
-        log_verbose(f'Scraping photos      ', verbose_switch)
         num_offers = len(moto_shelf)
         for index, (key, moto) in enumerate(moto_shelf.items()):
-            log_verbose(f'Downloading photos for all offers {int((index / num_offers) * 100)}%', verbose_switch, end='\r')
-            moto_shelf[key] = scrape_details_for_offer(moto, verbose_switch=False)
+            progress = soup_counter / num_pages
+            log_message = f'Downloading photos {int((index / num_offers) * 100)}%'
+            log_verbose(log_message, verbose_switch, end="\r")
+            if progress_queue is not None:
+                progress_queue.put(progress_description(progress, log_message))
+                moto_shelf[key] = scrape_details_for_offer(moto, verbose_switch=False)
 
     moto_shelf.close()
 
@@ -169,7 +172,7 @@ def scrape_offer_list(dist, loc, shelf_name=None, shelf_ready_event=None, progre
 
     return shelf_name
 
-def scrape_details_for_offer(moto, verbose_switch=True):
+def scrape_details_for_offer(moto, verbose_switch=False):
     if not os.path.isdir("data"):
         os.mkdir("data")
     offer_dir = f'data/{moto.moto_id}'
