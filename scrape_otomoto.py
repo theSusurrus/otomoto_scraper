@@ -9,6 +9,11 @@ import os
 import shutil
 from moto import *
 
+class progress_description:
+    def __init__(self, progress=0, description=''):
+        self.progress = progress
+        self.description = description
+
 def simple_get(url):
     """
     Attempts to get the content at `url` by making an HTTP GET request.
@@ -47,7 +52,10 @@ def log_verbose(string, verbose_switch, end="\n"):
     if verbose_switch:
         print(string, end=end)
 
-def scrape_offer_list(dist, loc, cat = 'motocykle-i-quady', verbose_switch = False, scrape_details=False):
+def scrape_offer_list(dist, loc, shelf_name=None, shelf_ready_event=None, progress_queue=None, scrape_details=False, cat = 'motocykle-i-quady', verbose_switch = True):
+    if shelf_ready_event is not None:
+        shelf_ready_event.clear()
+
     base_url = 'https://www.otomoto.pl'
     post_url = f'?search[order]=created_at_first%3Adesc&search[dist]={dist}&search[country]='
     url = '/'.join([base_url, cat, loc, post_url])
@@ -67,24 +75,31 @@ def scrape_offer_list(dist, loc, cat = 'motocykle-i-quady', verbose_switch = Fal
         url += f'&page={page_idx}'
         raw_html = simple_get(url)
         soup_list.append(BeautifulSoup(raw_html, 'html.parser'))
-        log_verbose(f'download {((page_idx / num_pages) * 100):.0f}%', verbose_switch, end="\r")
-        
-    timestamp = time.strftime("%Y_%m_%d", time.localtime())
-    if not os.path.isdir('data/'):
-        os.mkdir('data/')
-    db_directory = f"data/snapshot_{loc}_{dist}_{timestamp}"
-    if os.path.isdir(db_directory):
-        shutil.rmtree(db_directory)
-    os.mkdir(db_directory)
-    offer_file = open(f"{db_directory}/offer_file.html", "w+")
-    moto_shelf_filename = f"{db_directory}/moto_shelf"
-    moto_shelf = shelve.open(moto_shelf_filename)
+
+        progress = (page_idx / num_pages)
+        log_message = f'Downloading {progress * 100:.0f}%'
+        if progress_queue is not None:
+            progress_queue.put(progress_description(progress, log_message))
+        log_verbose(log_message, verbose_switch, end="\r")
+
+    if shelf_name is None:
+        timestamp = time.strftime("%Y_%m_%d", time.localtime())
+        if not os.path.isdir('data/'):
+            os.mkdir('data/')
+        db_directory = f"data/snapshot_{loc}_{dist}_{timestamp}"
+        if os.path.isdir(db_directory):
+            shutil.rmtree(db_directory)
+        os.mkdir(db_directory)
+        shelf_name = f"{db_directory}/moto_shelf"
+    moto_shelf = shelve.open(shelf_name)
 
     for soup_counter, soup in enumerate(soup_list):
-        log_verbose(f'interpreting {((soup_counter / num_pages) * 100):.0f}%', verbose_switch, end="\r")
+        progress = soup_counter / num_pages
+        log_message = f'Interpreting {(progress * 100):.0f}%'
+        log_verbose(log_message, verbose_switch, end="\r")
+        if progress_queue is not None:
+            progress_queue.put(progress_description(progress, log_message))
         for offer in soup.find_all(class_="offer-item__content ds-details-container"):
-            offer_file.write(str(offer))
-
             offer_model = offer.find(class_="offer-title__link").attrs['title']
 
             offer_link = offer.find(class_="offer-title__link").attrs['href']
@@ -138,20 +153,23 @@ def scrape_offer_list(dist, loc, cat = 'motocykle-i-quady', verbose_switch = Fal
             moto = motorcycle_offer(model_name = offer_model, capacity_cm3 = offer_capacity, price = offer_price, currency = offer_currency, url = offer_link, body = offer_body, mileage = offer_mileage, year = offer_year, moto_id=offer_id)
             moto_shelf[str(offer_id)] = moto
 
-    if scrape_details_for_offer:
+    if scrape_details:
         log_verbose(f'Scraping photos      ', verbose_switch)
         num_offers = len(moto_shelf)
-        for index, key in enumerate(moto_shelf):
-            log_verbose(f'downloading {int((index / num_offers) * 100)}%', verbose_switch, end='\r')
-            scrape_details_for_offer(moto_shelf[key])
+        for index, (key, moto) in enumerate(moto_shelf.items()):
+            log_verbose(f'Downloading photos for all offers {int((index / num_offers) * 100)}%', verbose_switch, end='\r')
+            moto_shelf[key] = scrape_details_for_offer(moto, verbose_switch=False)
 
     moto_shelf.close()
 
-    log_verbose(f'Dumped snapshot to {db_directory}/', verbose_switch)
+    log_verbose(f'Dumped snapshot to {shelf_name}', verbose_switch)
 
-    return moto_shelf_filename
+    if shelf_ready_event is not None:
+        shelf_ready_event.set()
 
-def scrape_details_for_offer(moto):
+    return shelf_name
+
+def scrape_details_for_offer(moto, verbose_switch=True):
     if not os.path.isdir("data"):
         os.mkdir("data")
     offer_dir = f'data/{moto.moto_id}'
@@ -161,6 +179,7 @@ def scrape_details_for_offer(moto):
         soup = BeautifulSoup(raw_html, 'html.parser')
         photo_tags = soup.find_all(class_="bigImage")
         for photo_idx, photo_tag in enumerate(photo_tags):
+            log_verbose(f'Downloading photos for offer {int(photo_idx / len(photo_tags) * 100)}%', verbose_switch, end='\r')
             photo_url = photo_tag.attrs['data-lazy']
             with open(f'{offer_dir}/img{photo_idx}.jpg', 'wb') as photo_file:
                 response = requests.get(photo_url, stream=True)
@@ -173,6 +192,7 @@ def scrape_details_for_offer(moto):
         description_tag = soup.find(class_="offer-description__description")
         description_text = [str(content).replace('\n', '').strip() for content in description_tag.contents if isinstance(content, str) and str(content) != '\n']
         moto.description = '\n'.join(description_text)
+    return moto
 
 if __name__ == "__main__":
     scrape_offer_list(loc='lodz', dist=5, verbose_switch=True, scrape_details=True)

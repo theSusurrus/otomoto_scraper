@@ -11,6 +11,12 @@ class motorcycle_offer:
         self.moto_id = int(moto_id) if moto_id is not None else None
         self.description = None
 
+    def __eq__(self, other):
+        if other is not motorcycle_offer:
+            return False
+        else:
+            return self.moto_id == other.moto_id
+
     def __str__(self):
         result = f'{self.model_name}'
         if self.capacity_cm3 != None:
