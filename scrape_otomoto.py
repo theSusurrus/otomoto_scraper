@@ -142,7 +142,7 @@ def scrape_offer_list(dist, loc, shelf_name=None, shelf_ready_event=None, progre
                 offer_price = offer_price.replace(' ', '')
                 offer_price = int(offer_price)
             else:
-                None
+                offer_price = None
             
             offer_currency_tag = offer.find(class_="offer-price__number ds-price-number")
             if offer_currency_tag is not None:
@@ -161,7 +161,7 @@ def scrape_offer_list(dist, loc, shelf_name=None, shelf_ready_event=None, progre
             log_verbose(log_message, verbose_switch, end="\r")
             if progress_queue is not None:
                 progress_queue.put(progress_description(progress, log_message))
-                moto_shelf[key] = scrape_details_for_offer(moto, verbose_switch=False)
+            moto_shelf[key] = scrape_details_for_offer(moto, verbose_switch=False)
 
     moto_shelf.close()
 
