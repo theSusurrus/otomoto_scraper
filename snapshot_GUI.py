@@ -165,8 +165,7 @@ class SnapshotBrowserApp:
                 self.shelf.close()
             filename = tki.filedialog.askopenfilename(initialdir=os.path.dirname(os.path.abspath(__file__)))
             start_index = filename.index("data/")
-            end_index = filename.index(".")
-            shelf_name = filename[start_index:end_index]
+            shelf_name = filename[start_index:]
             self.shelf = shelve.open(shelf_name)
             self.construct_listbox_list()
 
