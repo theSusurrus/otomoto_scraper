@@ -1,3 +1,11 @@
+class moto_attribute:
+    def __init__(self, name, value):
+        self.name = name
+        self.value = value
+    
+    def __str__(self):
+        return f'{self.name}: {self.value}'
+
 class motorcycle_offer:
     def __init__(self, model_name, capacity_cm3, price, currency, url, body, mileage, year, moto_id):
         self.model_name = str(model_name)
@@ -10,6 +18,7 @@ class motorcycle_offer:
         self.year = str(year)
         self.moto_id = int(moto_id) if moto_id is not None else None
         self.description = None
+        self.attributes = []
 
     def __eq__(self, other):
         if other is not motorcycle_offer:
@@ -32,4 +41,6 @@ class motorcycle_offer:
         result.append(f'{self.price} {self.currency}\n')
         result.append(f'{self.description}\n')
         result.append(f'{self.url}\n')
+        for att in self.attributes:
+            result.append(f'{str(att)}\n')
         return ''.join(result)

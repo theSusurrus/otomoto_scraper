@@ -172,10 +172,15 @@ def scrape_offer_list(dist, loc, shelf_name=None, shelf_ready_event=None, progre
 
     return shelf_name
 
-def scrape_details_for_offer(moto, verbose_switch=False):
+def scrape_details_for_offer(moto, verbose_switch=False, overwrite=True):
     if not os.path.isdir("data"):
         os.mkdir("data")
     offer_dir = f'data/{moto.moto_id}'
+
+    if overwrite:
+        if os.path.isdir(offer_dir):
+            shutil.rmtree(offer_dir)
+
     if not os.path.isdir(offer_dir):
         os.mkdir(offer_dir)
         raw_html = simple_get(moto.url)
@@ -192,10 +197,22 @@ def scrape_details_for_offer(moto, verbose_switch=False):
                     if not block:
                         break
                     photo_file.write(block)
+
         description_tag = soup.find(class_="offer-description__description")
         description_text = [str(content).replace('\n', '').strip() for content in description_tag.contents if isinstance(content, str) and str(content) != '\n']
         moto.description = '\n'.join(description_text)
+
+        attribute_tags = soup.find_all(class_="offer-params__item")
+        for attribute_tag in attribute_tags:
+            attribute_soup = BeautifulSoup(str(attribute_tag.contents), 'html.parser')
+
+            #TODO: Add <a> tag parsing, to extract the tag title
+            attribute_label = attribute_soup.find(class_="offer-params__label").contents
+            attribute_value = attribute_soup.find(class_="offer-params__value").contents
+
+            attribute = moto_attribute(attribute_label, attribute_value)
+            moto.attributes.append(attribute)
     return moto
 
 if __name__ == "__main__":
-    scrape_offer_list(loc='lodz', dist=5, verbose_switch=True, scrape_details=True)
+    scrape_offer_list(loc='kolo', dist=5, verbose_switch=True, scrape_details=True)
