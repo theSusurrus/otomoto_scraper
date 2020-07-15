@@ -52,7 +52,7 @@ def log_verbose(string, verbose_switch, end="\n"):
     if verbose_switch:
         print(string, end=end)
 
-def scrape_offer_list(dist, loc, shelf_name=None, shelf_ready_event=None, progress_queue=None, scrape_details=False, cat = 'motocykle-i-quady', verbose_switch = False, overwrite=False):
+def scrape_offer_list(dist, loc, shelf_name=None, shelf_ready_event=None, progress_queue=None, scrape_details=False, cat = 'motocykle-i-quady', verbose_switch = False, overwrite=False, scrape_photos=False):
     if shelf_ready_event is not None:
         shelf_ready_event.clear()
 
@@ -157,11 +157,14 @@ def scrape_offer_list(dist, loc, shelf_name=None, shelf_ready_event=None, progre
         num_offers = len(moto_shelf)
         for index, (key, moto) in enumerate(moto_shelf.items()):
             progress = soup_counter / num_pages
-            log_message = f'Downloading photos {int((index / num_offers) * 100)}%'
+            log_message = f'Downloading details {int((index / num_offers) * 100)}%'
             log_verbose(log_message, verbose_switch, end="\r")
             if progress_queue is not None:
                 progress_queue.put(progress_description(progress, log_message))
-            moto_shelf[key] = scrape_details_for_offer(moto, verbose_switch=False, overwrite=overwrite)
+            
+            moto = scrape_details_for_offer(moto, verbose_switch=False, download_photos=scrape_photos, overwrite_photos=False)
+            if moto is not None:
+                moto_shelf[key] = moto
 
     moto_shelf.close()
 
@@ -172,52 +175,57 @@ def scrape_offer_list(dist, loc, shelf_name=None, shelf_ready_event=None, progre
 
     return shelf_name
 
-def scrape_details_for_offer(moto, verbose_switch=False, overwrite=False):
+def scrape_details_for_offer(moto, verbose_switch=False, overwrite_photos=False, download_photos=False):
+    raw_html = simple_get(moto.url)
+    if raw_html is None:
+        return None
+    soup = BeautifulSoup(raw_html, 'html.parser')
+
     if not os.path.isdir("data"):
         os.mkdir("data")
-    offer_dir = f'data/{moto.moto_id}'
 
-    if overwrite:
-        if os.path.isdir(offer_dir):
-            shutil.rmtree(offer_dir)
+    if download_photos:
+        offer_dir = f'data/{moto.moto_id}'
 
-    if not os.path.isdir(offer_dir):
-        os.mkdir(offer_dir)
-        raw_html = simple_get(moto.url)
-        soup = BeautifulSoup(raw_html, 'html.parser')
-        photo_tags = soup.find_all(class_="bigImage")
-        for photo_idx, photo_tag in enumerate(photo_tags):
-            log_verbose(f'Downloading photos for offer {int(photo_idx / len(photo_tags) * 100)}%', verbose_switch, end='\r')
-            photo_url = photo_tag.attrs['data-lazy']
-            with open(f'{offer_dir}/img{photo_idx}.jpg', 'wb') as photo_file:
-                response = requests.get(photo_url, stream=True)
-                if not response.ok:
-                    print(response)
-                for block in response.iter_content(1024):
-                    if not block:
-                        break
-                    photo_file.write(block)
+        if overwrite_photos:
+            if os.path.isdir(offer_dir):
+                shutil.rmtree(offer_dir)
 
-        description_tag = soup.find(class_="offer-description__description")
-        description_text = [str(content).replace('\n', '').strip() for content in description_tag.contents if isinstance(content, str) and str(content) != '\n']
-        moto.description = '\n'.join(description_text)
+        if not os.path.isdir(offer_dir):
+            os.mkdir(offer_dir)
+            photo_tags = soup.find_all(class_="bigImage")
+            for photo_idx, photo_tag in enumerate(photo_tags):
+                log_verbose(f'Downloading photos for offer {int(photo_idx / len(photo_tags) * 100)}%', verbose_switch, end='\r')
+                photo_url = photo_tag.attrs['data-lazy']
+                with open(f'{offer_dir}/img{photo_idx}.jpg', 'wb') as photo_file:
+                    response = requests.get(photo_url, stream=True)
+                    if not response.ok:
+                        print(response)
+                    for block in response.iter_content(1024):
+                        if not block:
+                            break
+                        photo_file.write(block)
 
-        parameter_tags = soup.find_all(class_="offer-params__item")
-        for parameter_tag in parameter_tags:
-            parameter_soup = BeautifulSoup(str(parameter_tag.contents), 'html.parser')
+    description_tag = soup.find(class_="offer-description__description")
+    description_text = [str(content).replace('\n', '').strip() for content in description_tag.contents if isinstance(content, str) and str(content) != '\n']
+    moto.description = '\n'.join(description_text)
 
-            #TODO: Add <a> tag parsing, to extract the tag title
-            parameter_label = parameter_soup.find(class_="offer-params__label").contents[0].strip()
-            parameter_value_contents = parameter_soup.find(class_="offer-params__value").contents
-            parameter_value_soup = BeautifulSoup(str(parameter_value_contents), 'html.parser')
-            parameter_value_a_tags = parameter_value_soup.find_all('a')
-            if len(parameter_value_a_tags) == 0:
-                parameter_value = parameter_value_contents
-            else:
-                parameter_value = parameter_value_a_tags[0].contents[0].strip()
+    parameter_tags = soup.find_all(class_="offer-params__item")
+    for parameter_tag in parameter_tags:
+        parameter_soup = BeautifulSoup(str(parameter_tag.contents), 'html.parser')
 
-            moto.parameters[parameter_label] = parameter_value
+        parameter_label = parameter_soup.find(class_="offer-params__label").contents[0].strip()
+        parameter_value_contents = parameter_soup.find(class_="offer-params__value").contents
+        parameter_value_soup = BeautifulSoup(str(parameter_value_contents), 'html.parser')
+        parameter_value_a_tags = parameter_value_soup.find_all('a')
+        if len(parameter_value_a_tags) == 0:
+            parameter_value = parameter_value_contents
+        else:
+            #TODO: add value parsing to eliminate garbage
+            parameter_value = parameter_value_a_tags[0].contents[0].strip()
+
+        moto.parameters[parameter_label] = parameter_value
     return moto
 
 if __name__ == "__main__":
-    scrape_offer_list(loc='kolo', dist=5, verbose_switch=True, scrape_details=True, overwrite=True)
+    scrape_offer_list(loc='lodz', dist=100, verbose_switch=True, scrape_details=True, overwrite=False)

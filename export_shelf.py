@@ -11,4 +11,4 @@ def print_shelf(shelf_name):
             print(moto_str)
 
 if __name__ == "__main__":
-    print_shelf("data/snapshot_kolo_5_2020_07_15/moto_shelf")
+    print_shelf("data/snapshot_lodz_5_2020_07_15/moto_shelf")
