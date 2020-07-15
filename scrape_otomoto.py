@@ -172,7 +172,7 @@ def scrape_offer_list(dist, loc, shelf_name=None, shelf_ready_event=None, progre
 
     return shelf_name
 
-def scrape_details_for_offer(moto, verbose_switch=False, overwrite=True):
+def scrape_details_for_offer(moto, verbose_switch=False, overwrite=False):
     if not os.path.isdir("data"):
         os.mkdir("data")
     offer_dir = f'data/{moto.moto_id}'
@@ -215,4 +215,4 @@ def scrape_details_for_offer(moto, verbose_switch=False, overwrite=True):
     return moto
 
 if __name__ == "__main__":
-    scrape_offer_list(loc='kolo', dist=5, verbose_switch=True, scrape_details=True)
+    scrape_offer_list(loc='lodz', dist=5, verbose_switch=True, scrape_details=True)

@@ -1,3 +1,5 @@
+from color_codes import colors
+
 class moto_attribute:
     def __init__(self, name, value):
         self.name = name
@@ -29,18 +31,19 @@ class motorcycle_offer:
     def __str__(self):
         result = f'{self.model_name}'
         if self.capacity_cm3 != None:
-            result += f' {self.capacity_cm3} cm3'
+            result += f' {self.capacity_cm3}cm3'
         return result
 
-    def pretty_str(self):
+    def pretty_str(self, attributes=False):
         result = []
-        result.append(f'{self.model_name}\n')
+        result.append(colors.MAGENTA + f'{self.model_name}\n' + colors.RESET)
         result.append(f'{self.year}\n')
         result.append(f'{self.mileage} km\n')
-        result.append(f'{self.capacity_cm3} cm3\n')
-        result.append(f'{self.price} {self.currency}\n')
+        result.append(colors.MAGENTA + f'{self.capacity_cm3} cm3\n' + colors.RESET)
+        result.append(colors.CYAN + f'{self.price} {self.currency}\n' + colors.RESET)
         result.append(f'{self.description}\n')
         result.append(f'{self.url}\n')
-        for att in self.attributes:
-            result.append(f'{str(att)}\n')
+        if attributes:
+            for att in self.attributes:
+                result.append(f'{str(att)}\n')
         return ''.join(result)
