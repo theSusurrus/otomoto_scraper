@@ -7,8 +7,8 @@ def print_shelf(shelf_name):
         id_list = shelf.keys()
         for index, id in enumerate(id_list):
             moto = shelf[id]
-            moto_str = shelf[id].pretty_str()
+            moto_str = shelf[id].pretty_str(parameters=True)
             print(moto_str)
 
 if __name__ == "__main__":
-    print_shelf("data/snapshot_kolo_5_2020_07_14/moto_shelf")
+    print_shelf("data/snapshot_kolo_5_2020_07_15/moto_shelf")

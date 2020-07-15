@@ -52,7 +52,7 @@ def log_verbose(string, verbose_switch, end="\n"):
     if verbose_switch:
         print(string, end=end)
 
-def scrape_offer_list(dist, loc, shelf_name=None, shelf_ready_event=None, progress_queue=None, scrape_details=False, cat = 'motocykle-i-quady', verbose_switch = False):
+def scrape_offer_list(dist, loc, shelf_name=None, shelf_ready_event=None, progress_queue=None, scrape_details=False, cat = 'motocykle-i-quady', verbose_switch = False, overwrite=False):
     if shelf_ready_event is not None:
         shelf_ready_event.clear()
 
@@ -161,7 +161,7 @@ def scrape_offer_list(dist, loc, shelf_name=None, shelf_ready_event=None, progre
             log_verbose(log_message, verbose_switch, end="\r")
             if progress_queue is not None:
                 progress_queue.put(progress_description(progress, log_message))
-            moto_shelf[key] = scrape_details_for_offer(moto, verbose_switch=False)
+            moto_shelf[key] = scrape_details_for_offer(moto, verbose_switch=False, overwrite=overwrite)
 
     moto_shelf.close()
 
@@ -202,17 +202,22 @@ def scrape_details_for_offer(moto, verbose_switch=False, overwrite=False):
         description_text = [str(content).replace('\n', '').strip() for content in description_tag.contents if isinstance(content, str) and str(content) != '\n']
         moto.description = '\n'.join(description_text)
 
-        attribute_tags = soup.find_all(class_="offer-params__item")
-        for attribute_tag in attribute_tags:
-            attribute_soup = BeautifulSoup(str(attribute_tag.contents), 'html.parser')
+        parameter_tags = soup.find_all(class_="offer-params__item")
+        for parameter_tag in parameter_tags:
+            parameter_soup = BeautifulSoup(str(parameter_tag.contents), 'html.parser')
 
             #TODO: Add <a> tag parsing, to extract the tag title
-            attribute_label = attribute_soup.find(class_="offer-params__label").contents
-            attribute_value = attribute_soup.find(class_="offer-params__value").contents
+            parameter_label = parameter_soup.find(class_="offer-params__label").contents[0].strip()
+            parameter_value_contents = parameter_soup.find(class_="offer-params__value").contents
+            parameter_value_soup = BeautifulSoup(str(parameter_value_contents), 'html.parser')
+            parameter_value_a_tags = parameter_value_soup.find_all('a')
+            if len(parameter_value_a_tags) == 0:
+                parameter_value = parameter_value_contents
+            else:
+                parameter_value = parameter_value_a_tags[0].contents[0].strip()
 
-            attribute = moto_attribute(attribute_label, attribute_value)
-            moto.attributes.append(attribute)
+            moto.parameters[parameter_label] = parameter_value
     return moto
 
 if __name__ == "__main__":
-    scrape_offer_list(loc='lodz', dist=5, verbose_switch=True, scrape_details=True)
+    scrape_offer_list(loc='kolo', dist=5, verbose_switch=True, scrape_details=True, overwrite=True)

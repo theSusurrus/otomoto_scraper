@@ -1,13 +1,5 @@
 from color_codes import colors
 
-class moto_attribute:
-    def __init__(self, name, value):
-        self.name = name
-        self.value = value
-    
-    def __str__(self):
-        return f'{self.name}: {self.value}'
-
 class motorcycle_offer:
     def __init__(self, model_name, capacity_cm3, price, currency, url, body, mileage, year, moto_id):
         self.model_name = str(model_name)
@@ -20,7 +12,8 @@ class motorcycle_offer:
         self.year = str(year)
         self.moto_id = int(moto_id) if moto_id is not None else None
         self.description = None
-        self.attributes = []
+        self.parameters = {}
+        self.features = {}
 
     def __eq__(self, other):
         if other is not motorcycle_offer:
@@ -34,7 +27,7 @@ class motorcycle_offer:
             result += f' {self.capacity_cm3}cm3'
         return result
 
-    def pretty_str(self, attributes=False):
+    def pretty_str(self, parameters=False):
         result = []
         result.append(colors.MAGENTA + f'{self.model_name}\n' + colors.RESET)
         result.append(f'{self.year}\n')
@@ -43,7 +36,7 @@ class motorcycle_offer:
         result.append(colors.CYAN + f'{self.price} {self.currency}\n' + colors.RESET)
         result.append(f'{self.description}\n')
         result.append(f'{self.url}\n')
-        if attributes:
-            for att in self.attributes:
-                result.append(f'{str(att)}\n')
+        if parameters:
+            for key in self.parameters.keys():
+                result.append(f'{key}: {self.parameters[key]}\n')
         return ''.join(result)
