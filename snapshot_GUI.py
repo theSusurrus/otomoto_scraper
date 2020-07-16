@@ -273,7 +273,10 @@ class SnapshotBrowserApp:
         self.canvas_ratio = canvas_width / canvas_height
         if true_photo:
             image_filename = self.get_image_filename(self.current_moto, self.current_image_index)
-            self.raw_image = Image.open(image_filename)
+            try:
+                self.raw_image = Image.open(image_filename)
+            except FileNotFoundError:
+                return
             image_ratio = self.raw_image.width / self.raw_image.height
             new_size = None
             if image_ratio > self.canvas_ratio:
