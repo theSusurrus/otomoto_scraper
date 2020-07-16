@@ -27,16 +27,24 @@ class motorcycle_offer:
             result += f' {self.capacity_cm3}cm3'
         return result
 
-    def pretty_str(self, parameters=False):
+    def pretty_str(self, parameters=False, basic=True):
         result = []
-        result.append(colors.MAGENTA + f'{self.model_name}\n' + colors.RESET)
-        result.append(f'{self.year}\n')
-        result.append(f'{self.mileage} km\n')
-        result.append(colors.MAGENTA + f'{self.capacity_cm3} cm3\n' + colors.RESET)
-        result.append(colors.CYAN + f'{self.price} {self.currency}\n' + colors.RESET)
-        result.append(f'{self.description}\n')
-        result.append(f'{self.url}\n')
-        if parameters:
-            for key in self.parameters.keys():
-                result.append(f'{key}: {self.parameters[key]}\n')
+        if basic:
+            result.append(f'{self.model_name}\n')
+            result.append(f'{self.year}\n')
+            result.append(f'{self.mileage}km\n')
+            result.append(f'{self.capacity_cm3}cm3\n')
+            result.append(f'{self.price}{self.currency}\n')
+            result.append(f'{self.url}\n')
+        else:
+            result.append(colors.MAGENTA + f'{self.model_name}\n' + colors.RESET)
+            result.append(f'{self.year}\n')
+            result.append(f'{self.mileage}km\n')
+            result.append(colors.MAGENTA + f'{self.capacity_cm3}cm3\n' + colors.RESET)
+            result.append(colors.CYAN + f'{self.price}{self.currency}\n' + colors.RESET)
+            result.append(f'{self.description}\n')
+            result.append(f'{self.url}\n')
+            if parameters:
+                for key in self.parameters.keys():
+                    result.append(f'{key}: {self.parameters[key]}\n')
         return ''.join(result)
