@@ -9,7 +9,7 @@ if __name__ == "__main__":
     parser.add_argument('-l', "--location", type=str, default='lodz')
     parser.add_argument('-d', "--distance", type=int, default=5)
     parser.add_argument("-f", "--shelf_file", type=str, default=None)
-    parser.add_argument("-sd", "--details", action='store_true', default=False)
+    parser.add_argument("-sd", "--scrape_details", action='store_true', default=False)
     parser.add_argument("-q", "--quiet", action='store_true', default=False)
     parser.add_argument("-o", "--overwrite", action='store_true', default=False)
     parser.add_argument("-p", "--photos", action='store_true', default=False)
@@ -23,7 +23,7 @@ if __name__ == "__main__":
         args.distance,
         args.location.strip(),
         shelf_name=shelf_file,
-        scrape_details=args.details,
+        scrape_details=args.scrape_details,
         verbose_switch=not args.quiet,
         overwrite=args.overwrite,
         scrape_photos=args.photos
