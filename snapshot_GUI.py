@@ -13,6 +13,7 @@ import glob
 import threading
 import time
 import queue
+import re
 
 class SnapshotBrowserApp:
     def __init__(self, parent):
@@ -63,6 +64,11 @@ class SnapshotBrowserApp:
         self.next_picture_button = tki.Button(self.picture_buttons_container, text="->")
         self.next_picture_button.pack(side=tki.RIGHT)
         self.next_picture_button.bind("<Button-1>", lambda event: self.switch_picture(increment=1))
+
+        self.snapshot_filter_stringvar = tki.StringVar()
+        self.snapshot_filter_stringvar.trace("w", lambda name, index, mode, sv=self.snapshot_filter_stringvar: self.construct_listbox_list(self.snapshot_filter_stringvar.get()))
+        self.snapshot_filter_entry = tki.Entry(self.snapshot_container, textvariable=self.snapshot_filter_stringvar)
+        self.snapshot_filter_entry.pack(side=tki.TOP, fill=tki.X)
 
         self.snapshot_list = tki.Listbox(self.snapshot_container, width=50)
         self.snapshot_list.pack(side=tki.BOTTOM, fill=tki.Y, expand=True)
@@ -242,13 +248,20 @@ class SnapshotBrowserApp:
             self.store_moto(moto)
         self.details_ready_event.set()
 
-    def construct_listbox_list(self):
+    def construct_listbox_list(self, regex=None):
         self.snapshot_list.delete(0, tki.END)
         if self.shelf is not None:
             id_list = self.shelf.keys()
-            for index, id in enumerate(id_list):
-                self.snapshot_list.insert(index, self.shelf[id])
-                self.index_to_id[index] = id
+            index = 0
+            for id in id_list:
+                match = None
+                if regex is not None:
+                    match = re.search(regex.strip().lower(), self.shelf[id].model_name.strip().lower())
+
+                if regex is None or match is not None:
+                    self.snapshot_list.insert(index, self.shelf[id])
+                    self.index_to_id[index] = id
+                    index += 1
         self.display_image()
         self.print_details()
     
@@ -262,12 +275,15 @@ class SnapshotBrowserApp:
         if (not os.path.isfile(image_filename)) or (self.current_moto.description is None):
             self.current_moto = scrape_details_for_offer(self.current_moto)
             self.store_moto(self.current_moto)
-            self.construct_listbox_list()
+            # self.construct_listbox_list()
 
     def get_image_filename(self, moto, image_idx):
         return f'data/{moto.moto_id}/img{image_idx}.jpg'
 
     def display_image(self, true_photo=False):
+        if self.current_image_index is None:
+            return
+
         canvas_width = self.detail_canvas.winfo_width()
         canvas_height = self.detail_canvas.winfo_height()
         self.canvas_ratio = canvas_width / canvas_height
